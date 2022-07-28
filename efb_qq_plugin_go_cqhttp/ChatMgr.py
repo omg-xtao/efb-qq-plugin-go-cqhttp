@@ -56,7 +56,7 @@ class ChatManager:
         )
 
     async def build_efb_chat_as_group(self, context, update_member=False):  # Should be cached
-        is_discuss = False if context["message_type"] == "group" else True
+        is_discuss = context["message_type"] != "group"
         chat_uid = context["discuss_id"] if is_discuss else context["group_id"]
         efb_chat = GroupChat(channel=self.channel, uid=str(chat_uid))
         if not is_discuss:

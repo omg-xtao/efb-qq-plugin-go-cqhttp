@@ -52,6 +52,8 @@ from .Utils import (
     strf_time,
 )
 
+all_group_list = []
+
 
 class GoCQHttp(BaseClient):
     client_name: str = "GoCQHttp Client"
@@ -204,6 +206,11 @@ class GoCQHttp(BaseClient):
                     chat: PrivateChat = await self.chat_manager.build_efb_chat_as_private(context)
                 else:
                     chat = await self.chat_manager.build_efb_chat_as_group(context)
+                    is_discuss = context['message_type'] != 'group'
+                    chat_uid = context['discuss_id'] if is_discuss else context['group_id']
+                    if len(all_group_list) > 0 and chat_uid not in all_group_list:
+                        print(f"Filter 1 msg from {chat.uid} {chat.name}.")
+                        return
 
                 if "anonymous" not in context or context["anonymous"] is None:
                     if context["message_type"] == "group":
@@ -258,6 +265,9 @@ class GoCQHttp(BaseClient):
 
         @self.coolq_bot.on_notice("group_increase")
         async def handle_group_increase_msg(context: Event):
+            if len(all_group_list) > 0 and context["group_id"] not in all_group_list:
+                print(f"Filter 1 msg from {context['group_id']} .")
+                return
             context["event_description"] = "\u2139 Group Member Increase Event"
             if (context["sub_type"]) == "invite":
                 text = "{nickname}({context[user_id]}) joined the group({group_name}) via invitation"
@@ -279,6 +289,9 @@ class GoCQHttp(BaseClient):
 
         @self.coolq_bot.on_notice("group_decrease")
         async def handle_group_decrease_msg(context: Event):
+            if len(all_group_list) > 0 and context["group_id"] not in all_group_list:
+                print(f"Filter 1 msg from {context['group_id']} .")
+                return
             context["event_description"] = "\u2139 Group Member Decrease Event"
             original_group = await self.get_group_info(context["group_id"], False)
             group_name = context["group_id"]
@@ -302,6 +315,9 @@ class GoCQHttp(BaseClient):
 
         @self.coolq_bot.on_notice("group_admin")
         async def handle_group_admin_msg(context: Event):
+            if len(all_group_list) > 0 and context["group_id"] not in all_group_list:
+                print(f"Filter 1 msg from {context['group_id']} .")
+                return
             context["event_description"] = "\u2139 Group Admin Change Event"
             if (context["sub_type"]) == "set":
                 text = "{nickname}({context[user_id]}) has been appointed as the group({group_name}) administrator"
@@ -323,6 +339,9 @@ class GoCQHttp(BaseClient):
 
         @self.coolq_bot.on_notice("group_ban")
         async def handle_group_ban_msg(context: Event):
+            if len(all_group_list) > 0 and context["group_id"] not in all_group_list:
+                print(f"Filter 1 msg from {context['group_id']} .")
+                return
             context["event_description"] = "\u2139 Group Member Restrict Event"
             if (context["sub_type"]) == "ban":
                 text = (
@@ -376,6 +395,9 @@ class GoCQHttp(BaseClient):
         @self.coolq_bot.on_notice("group_upload")
         async def handle_group_file_upload_msg(context: Event):
             async def _handle_group_file_upload_msg():
+                if len(all_group_list) > 0 and context["group_id"] not in all_group_list:
+                    print(f"Filter 1 msg from {context['group_id']} .")
+                    return
                 context["event_description"] = "\u2139 Group File Upload Event"
                 context["uid_prefix"] = "group_upload"
                 original_group = await self.get_group_info(context["group_id"], False)
@@ -419,6 +441,9 @@ class GoCQHttp(BaseClient):
 
         @self.coolq_bot.on_notice("group_recall")
         async def handle_group_recall_msg(context: Event):
+            if len(all_group_list) > 0 and context["group_id"] not in all_group_list:
+                print(f"Filter 1 msg from {context['group_id']} .")
+                return
             coolq_msg_id = context["message_id"]
             chat = GroupChat(channel=self.channel, uid=f"group_{context['group_id']}")
 
@@ -474,6 +499,9 @@ class GoCQHttp(BaseClient):
         async def handle_group_request(context: Event):
             self.logger.debug(repr(context))
             group_info = await self.get_group_info(context["group_id"])
+            if len(all_group_list) > 0 and context["group_id"] not in all_group_list:
+                print(f"Filter 1 msg from {context['group_id']} .")
+                return
             context["uid_prefix"] = "group_request"
             context["group_name"] = "[Request]" + group_info["group_name"]
             group_name = group_id = context["group_id"]
@@ -1125,8 +1153,6 @@ class GoCQHttp(BaseClient):
                     "Please manually update EQS by stopping ehForwarderbot first and then execute "
                     "<code>pip3 install --upgrade efb-qq-slave</code>".format(version=latest_version)
                 )
-            else:
-                pass
             if run_once:
                 return
             await asyncio.sleep(interval)
