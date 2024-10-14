@@ -32,7 +32,8 @@ from ehforwarderbot.utils import extra
 from hypercorn.asyncio import serve
 from hypercorn.config import Config as HyperConfig
 from PIL import Image
-from quart.logging import create_serving_logger
+from quart.logging import create_logger
+from quart.app import Quart
 
 from .ChatMgr import ChatManager
 from .Exceptions import (
@@ -671,7 +672,7 @@ class GoCQHttp(BaseClient):
 
             config = HyperConfig()
             config.access_log_format = "%(h)s %(r)s %(s)s %(b)s %(D)s"
-            access_logger = create_serving_logger()
+            access_logger = create_logger(Quart("quart.serving"))
             access_logger.setLevel(logging.WARNING)
             config.accesslog = access_logger
             config.bind = [f"{host}:{port}"]
