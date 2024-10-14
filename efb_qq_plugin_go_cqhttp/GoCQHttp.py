@@ -191,13 +191,27 @@ class GoCQHttp(BaseClient):
             elif msg_type == "reply":
                 # TODO: FIX, KeyError "qq", can't receive reply message
                 try:
-                    ref_user = await self.get_user_info(msg_data["qq"])
-                    main_text = (
-                        f'「{ref_user["remark"]}（{ref_user["nickname"]}）：{msg_data["text"]}」\n'
-                        "- - - - - - - - - - - - - - -\n"
-                    )
+                    if "qq" in msg_data:
+                        # 如果 msg_data 中有 'qq' 字段，直接使用
+                        ref_user = await self.get_user_info(msg_data["qq"])
+                        main_text = (
+                            f'「{ref_user["remark"]}（{ref_user["nickname"]}）：{msg_data["text"]}」\n'
+                            "- - - - - - - - - - - - - - -\n"
+                        )
+                    else:
+                        # 如果没有 'qq'，通过 'id' 调用 get_msg 获取完整消息
+                        original_msg = await self.coolq_api_query("get_msg", message_id=msg_data["id"])
+                        ref_user = await self.get_user_info(original_msg["sender"]["user_id"])
+                        main_text = (
+                            f'「{ref_user["remark"]}（{ref_user["nickname"]}）：{original_msg["text"]}」\n'
+                            "- - - - - - - - - - - - - - -\n"
+                        )
                 except KeyError as e:
                     self.logger.error(f"KeyError occurred: {e}")
+                    self.logger.debug(f"Failed to process reply message with msg_data: {msg_data}")
+                    main_text = "An error occurred while processing the reply message."
+                except Exception as e:
+                    self.logger.error(f"An unexpected error occurred: {e}")
                     self.logger.debug(f"Failed to process reply message with msg_data: {msg_data}")
                     main_text = "An error occurred while processing the reply message."
             elif msg_type == "forward":
