@@ -209,11 +209,11 @@ class GoCQHttp(BaseClient):
                 except KeyError as e:
                     self.logger.error(f"KeyError occurred: {e}")
                     self.logger.debug(f"Failed to process reply message with msg_data: {msg_data}")
-                    main_text = "An error occurred while processing the reply message."
+                    main_text = ""
                 except Exception as e:
                     self.logger.error(f"An unexpected error occurred: {e}")
                     self.logger.debug(f"Failed to process reply message with msg_data: {msg_data}")
-                    main_text = "An error occurred while processing the reply message."
+                    main_text = ""
             elif msg_type == "forward":
                 forward_msgs = (await self.coolq_api_query("get_forward_msg", message_id=msg_data["id"]))["messages"]
                 logging.debug(f"Forwarded message: {forward_msgs}")
