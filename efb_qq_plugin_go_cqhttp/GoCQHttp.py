@@ -190,11 +190,16 @@ class GoCQHttp(BaseClient):
                     at_list.append(at_dict)
             elif msg_type == "reply":
                 # TODO: FIX, KeyError "qq", can't receive reply message
-                ref_user = await self.get_user_info(msg_data["qq"])
-                main_text = (
-                    f'「{ref_user["remark"]}（{ref_user["nickname"]}）：{msg_data["text"]}」\n'
-                    "- - - - - - - - - - - - - - -\n"
-                )
+                try:
+                    ref_user = await self.get_user_info(msg_data["qq"])
+                    main_text = (
+                        f'「{ref_user["remark"]}（{ref_user["nickname"]}）：{msg_data["text"]}」\n'
+                        "- - - - - - - - - - - - - - -\n"
+                    )
+                except KeyError as e:
+                    self.logger.error(f"KeyError occurred: {e}")
+                    self.logger.debug(f"Failed to process reply message with msg_data: {msg_data}")
+                    main_text = "An error occurred while processing the reply message."
             elif msg_type == "forward":
                 forward_msgs = (await self.coolq_api_query("get_forward_msg", message_id=msg_data["id"]))["messages"]
                 logging.debug(f"Forwarded message: {forward_msgs}")
