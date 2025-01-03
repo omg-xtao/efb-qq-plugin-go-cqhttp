@@ -195,7 +195,7 @@ class GoCQHttp(BaseClient):
                         # 如果 msg_data 中有 'qq' 字段，直接使用
                         ref_user = await self.get_user_info(msg_data["qq"])
                         main_text = (
-                            f'「{ref_user["remark"]}（{ref_user["nickname"]}）：{msg_data["text"]}」\n'
+                            f'「{ref_user["remark"]}（{ref_user["nickname"]}）：{msg_data.get("text", msg_data)}」\n'
                             "- - - - - - - - - - - - - - -\n"
                         )
                     else:
@@ -203,7 +203,7 @@ class GoCQHttp(BaseClient):
                         original_msg = await self.coolq_api_query("get_msg", message_id=msg_data["id"])
                         ref_user = await self.get_user_info(original_msg["sender"]["user_id"])
                         main_text = (
-                            f'「{ref_user["remark"]}（{ref_user["nickname"]}）：{original_msg["text"]}」\n'
+                            f'「{ref_user["remark"]}（{ref_user["nickname"]}）：{original_msg.get("text", original_msg)}」\n'
                             "- - - - - - - - - - - - - - -\n"
                         )
                 except KeyError as e:
