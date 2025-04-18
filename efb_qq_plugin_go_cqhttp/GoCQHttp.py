@@ -202,8 +202,14 @@ class GoCQHttp(BaseClient):
                         # 如果没有 'qq'，通过 'id' 调用 get_msg 获取完整消息
                         original_msg = await self.coolq_api_query("get_msg", message_id=msg_data["id"])
                         ref_user = await self.get_user_info(original_msg["sender"]["user_id"])
+                        original_text = original_msg.get("raw_message")
+                        if not original_text and "message" in original_msg and isinstance(original_msg["message"], list):
+                            text_segments = [seg["data"]["text"] for seg in original_msg["message"] if seg["type"] == "text" and "data" in seg and "text" in seg["data"]]
+                            original_text = "".join(text_segments)
+                        if not original_text:
+                            original_text = ""
                         main_text = (
-                            f'「{ref_user["remark"]}（{ref_user["nickname"]}）：{original_msg.get("text", original_msg)}」\n'
+                            f'「{ref_user["remark"]}（{ref_user["nickname"]}）：{original_text}」\n'
                             "- - - - - - - - - - - - - - -\n"
                         )
                 except KeyError as e:
