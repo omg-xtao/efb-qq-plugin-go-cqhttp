@@ -124,7 +124,14 @@ class GoCQHttp(BaseClient):
             fmt_msgs: List[Dict] = []
             for msg in msg_elements:
                 from_user = await self.get_user_info(msg["sender"]["user_id"])
-                header_text = {"data": {"text": f'{from_user["remark"]}（{from_user["nickname"]}）：\n'}, "type": "text"}
+                remark = str(from_user.get("remark", ""))
+                nickname = str(from_user.get("nickname", ""))
+                content_list = msg.get("content", [])
+                if not any((c.get("data", {}).get("text", "").strip()) for c in content_list):
+                    continue
+                header_text = {"data": {"text": f"{remark}（{nickname}）：\n"}, "type": "text"}
+                if remark == nickname == 1094950020:
+                    header_text = {"data": {"text": ""}, "type": "text"}
                 footer_text = {"data": {"text": "\n- - - - - - - - - - - - - - -\n"}, "type": "text"}
                 msg["content"].insert(0, header_text)
                 msg["content"].append(footer_text)
@@ -203,8 +210,16 @@ class GoCQHttp(BaseClient):
                         original_msg = await self.coolq_api_query("get_msg", message_id=msg_data["id"])
                         ref_user = await self.get_user_info(original_msg["sender"]["user_id"])
                         original_text = original_msg.get("raw_message")
-                        if not original_text and "message" in original_msg and isinstance(original_msg["message"], list):
-                            text_segments = [seg["data"]["text"] for seg in original_msg["message"] if seg["type"] == "text" and "data" in seg and "text" in seg["data"]]
+                        if (
+                            not original_text
+                            and "message" in original_msg
+                            and isinstance(original_msg["message"], list)
+                        ):
+                            text_segments = [
+                                seg["data"]["text"]
+                                for seg in original_msg["message"]
+                                if seg["type"] == "text" and "data" in seg and "text" in seg["data"]
+                            ]
                             original_text = "".join(text_segments)
                         if not original_text:
                             original_text = ""
