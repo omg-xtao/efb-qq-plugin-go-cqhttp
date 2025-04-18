@@ -68,7 +68,7 @@ class QQMsgProcessor:
         except Exception:
             efb_msg.type = MsgType.Unsupported
             efb_msg.text = "[Voice Message] Please check it on your QQ"
-            logging.getLogger(__name__).exception("Failed to download voice")
+            logging.getLogger(__name__).warning("Failed to download voice")
         return [efb_msg]
 
     def qq_share_wrapper(self, data, _: Chat = None):
