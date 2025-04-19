@@ -127,10 +127,8 @@ class GoCQHttp(BaseClient):
                 remark = str(from_user.get("remark", ""))
                 nickname = str(from_user.get("nickname", ""))
                 content_list = msg.get("content", [])
-                if not any((c.get("data", {}).get("text", "").strip()) for c in content_list):
-                    continue
                 header_text = {"data": {"text": f"{remark}（{nickname}）：\n"}, "type": "text"}
-                if remark == nickname == 1094950020:
+                if not any((c.get("data", {}).get("text", "").strip()) for c in content_list) or (remark == nickname == 1094950020):
                     header_text = {"data": {"text": ""}, "type": "text"}
                 footer_text = {"data": {"text": "\n- - - - - - - - - - - - - - -\n"}, "type": "text"}
                 msg["content"].insert(0, header_text)
