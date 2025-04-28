@@ -1,7 +1,10 @@
 [project]
 name = "efb-qq-plugin-go-cqhttp"
 description = "EQS plugin for Go-CQHttp API Compatible Client."
-authors = [{ name = "XYenon", email = "i@xyenon.bid" }]
+authors = [
+    { name = "XYenon", email = "i@xyenon.bid" },
+    { name = "omg-xtao", email = "xtao@xtao.de" }
+]
 dependencies = [
     "efb-qq-slave @ git+https://github.com/milkice233/efb-qq-slave@master",
     "ehforwarderbot>=2.1.1",
@@ -12,9 +15,9 @@ dependencies = [
     "hypercorn~=0.13.2",
     "pilk~=0.0.2",
     "pydub~=0.25.1",
-    "httpx>=0.23.3",
+    "httpx>=0.28.1",
 ]
-requires-python = ">=3.7"
+requires-python = ">=3.8"
 license = { text = "AGPL-3.0-only" }
 readme = "README.rst"
 keywords = [
@@ -35,7 +38,6 @@ classifiers = [
     "Topic :: Communications :: Chat",
     "Topic :: Utilities",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.7",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
@@ -43,7 +45,7 @@ classifiers = [
 dynamic = ["version"]
 
 [project.urls]
-homepage = "https://github.com/ehForwarderBot/efb-qq-plugin-go-cqhttp"
+homepage = "https://github.com/omg-xtao/efb-qq-plugin-go-cqhttp"
 
 [project.entry-points."ehforwarderbot.qq.plugin"]
 GoCQHttp = "efb_qq_plugin_go_cqhttp:GoCQHttp"
