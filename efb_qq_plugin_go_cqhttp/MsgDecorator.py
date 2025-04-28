@@ -5,12 +5,13 @@ import json
 import logging
 import sys
 from typing import TYPE_CHECKING
+from httpx import URL
 
 import magic
 from ehforwarderbot import Chat, Message, MsgType
 from ehforwarderbot.message import LinkAttribute, LocationAttribute, Substitutions
 
-from .Utils import cq_get_image, download_file, download_voice
+from .Utils import cq_get_image, download_voice
 
 if TYPE_CHECKING:
     from .GoCQHttp import GoCQHttp
@@ -338,11 +339,22 @@ class QQMsgProcessor:
         return [efb_msg]
 
     async def qq_video_wrapper(self, data, _: Chat = None):
-        res = await download_file(data["url"])
-        mime = magic.from_file(res.name, mime=True)
+        url = URL(data["url"]).copy_with(host="gchat.qpic.cn")
+        efb_msg = Message()
+        efb_msg.file = await cq_get_image(url)
+        if efb_msg.file is None:
+            efb_msg.type = MsgType.Text
+            efb_msg.text = "[Download video failed, please check on your QQ client]"
+            return [efb_msg]
+
+        efb_msg.type = MsgType.Video
+        mime = magic.from_file(efb_msg.file.name, mime=True)
         if isinstance(mime, bytes):
             mime = mime.decode()
-        efb_msg = Message(type=MsgType.Video, file=res, filename=res.name, mime=mime)
+        efb_msg.filename = data["file"] if "file" in data else efb_msg.file.name
+        efb_msg.filename += "." + str(mime).split("/")[1]
+        efb_msg.path = efb_msg.file.name
+        efb_msg.mime = mime
         return [efb_msg]
 
     def qq_unsupported_wrapper(self, data, _: Chat = None):
