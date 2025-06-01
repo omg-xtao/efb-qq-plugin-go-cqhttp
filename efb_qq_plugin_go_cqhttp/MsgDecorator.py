@@ -345,6 +345,10 @@ class QQMsgProcessor:
         efb_msg = Message(type=MsgType.Video, file=res, filename=res.name, mime=mime)
         return [efb_msg]
 
+    def qq_redbag_wrapper(self, data, _: Chat = None):
+        efb_msg = Message(type=MsgType.Text, text=f"QQ红包: {data['title']}")
+        return [efb_msg]
+
     def qq_unsupported_wrapper(self, data, _: Chat = None):
         efb_msg = Message(type=MsgType.Unsupported, text=data)
         return [efb_msg]
