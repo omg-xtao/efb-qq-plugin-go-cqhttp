@@ -3,10 +3,12 @@
 
 [metadata]
 groups = ["default", "dev"]
-cross_platform = true
-static_urls = false
-lock_version = "4.3"
-content_hash = "sha256:4b0aa3754ecf14ba9fb50f58b34d84f551696656e7335a548ab17799693cdbf1"
+strategy = ["cross_platform"]
+lock_version = "4.5.0"
+content_hash = "sha256:9adf517f3e0cf7feaadd28f0afc957d63b04ea18fc5887e3f1c4d39720ce6088"
+
+[[metadata.targets]]
+requires_python = ">=3.9"
 
 [[package]]
 name = "aiocqhttp"
@@ -37,6 +39,8 @@ version = "3.6.1"
 requires_python = ">=3.6.2"
 summary = "High level compatibility layer for multiple asynchronous event loop implementations"
 dependencies = [
+    "contextvars; python_version < \"3.7\"",
+    "dataclasses; python_version < \"3.7\"",
     "idna>=2.8",
     "sniffio>=1.1",
     "typing-extensions; python_version < \"3.8\"",
@@ -51,6 +55,8 @@ name = "apscheduler"
 version = "3.6.3"
 summary = "In-process task scheduler with Cron-like capabilities"
 dependencies = [
+    "funcsigs; python_version == \"2.7\"",
+    "futures; python_version == \"2.7\"",
     "pytz",
     "setuptools>=0.7",
     "six>=1.4.0",
@@ -62,32 +68,13 @@ files = [
 ]
 
 [[package]]
-name = "backports-zoneinfo"
-version = "0.2.1"
-requires_python = ">=3.6"
-summary = "Backport of the standard library zoneinfo module"
-files = [
-    {file = "backports.zoneinfo-0.2.1-cp37-cp37m-macosx_10_14_x86_64.whl", hash = "sha256:f04e857b59d9d1ccc39ce2da1021d196e47234873820cbeaad210724b1ee28ac"},
-    {file = "backports.zoneinfo-0.2.1-cp37-cp37m-manylinux1_i686.whl", hash = "sha256:17746bd546106fa389c51dbea67c8b7c8f0d14b5526a579ca6ccf5ed72c526cf"},
-    {file = "backports.zoneinfo-0.2.1-cp37-cp37m-manylinux1_x86_64.whl", hash = "sha256:5c144945a7752ca544b4b78c8c41544cdfaf9786f25fe5ffb10e838e19a27570"},
-    {file = "backports.zoneinfo-0.2.1-cp37-cp37m-win32.whl", hash = "sha256:e55b384612d93be96506932a786bbcde5a2db7a9e6a4bb4bffe8b733f5b9036b"},
-    {file = "backports.zoneinfo-0.2.1-cp37-cp37m-win_amd64.whl", hash = "sha256:a76b38c52400b762e48131494ba26be363491ac4f9a04c1b7e92483d169f6582"},
-    {file = "backports.zoneinfo-0.2.1-cp38-cp38-macosx_10_14_x86_64.whl", hash = "sha256:8961c0f32cd0336fb8e8ead11a1f8cd99ec07145ec2931122faaac1c8f7fd987"},
-    {file = "backports.zoneinfo-0.2.1-cp38-cp38-manylinux1_i686.whl", hash = "sha256:e81b76cace8eda1fca50e345242ba977f9be6ae3945af8d46326d776b4cf78d1"},
-    {file = "backports.zoneinfo-0.2.1-cp38-cp38-manylinux1_x86_64.whl", hash = "sha256:7b0a64cda4145548fed9efc10322770f929b944ce5cee6c0dfe0c87bf4c0c8c9"},
-    {file = "backports.zoneinfo-0.2.1-cp38-cp38-win32.whl", hash = "sha256:1b13e654a55cd45672cb54ed12148cd33628f672548f373963b0bff67b217328"},
-    {file = "backports.zoneinfo-0.2.1-cp38-cp38-win_amd64.whl", hash = "sha256:4a0f800587060bf8880f954dbef70de6c11bbe59c673c3d818921f042f9954a6"},
-    {file = "backports.zoneinfo-0.2.1.tar.gz", hash = "sha256:fadbfe37f74051d024037f223b8e001611eac868b5c5b06144ef4d8b799862f2"},
-]
-
-[[package]]
 name = "blinker"
-version = "1.5"
-requires_python = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
+version = "1.8.2"
+requires_python = ">=3.8"
 summary = "Fast, simple object-to-object and broadcast signaling"
 files = [
-    {file = "blinker-1.5-py2.py3-none-any.whl", hash = "sha256:1eb563df6fdbc39eeddc177d953203f99f097e9bf0e2b8f9f3cf18b6ca425e36"},
-    {file = "blinker-1.5.tar.gz", hash = "sha256:923e5e2f69c155f2cc42dafbbd70e16e3fde24d2d4aa2ab72fbe386238892462"},
+    {file = "blinker-1.8.2-py3-none-any.whl", hash = "sha256:1779309f71bf239144b9399d06ae925637cf6634cf6bd131104184531bf67c01"},
+    {file = "blinker-1.8.2.tar.gz", hash = "sha256:8f77b09d3bf7c795e969e9486f39c2c5e9c39d4ee07424be2bc594ece9642d83"},
 ]
 
 [[package]]
@@ -135,8 +122,11 @@ version = "8.6.0"
 requires_python = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,>=2.7"
 summary = "Highly-optimized, pure-python HTTP server"
 dependencies = [
+    "backports-functools-lru-cache; python_version < \"3.3\"",
     "jaraco-functools",
+    "more-itertools<8.11.0,>=2.6; python_version < \"3.6\"",
     "more-itertools>=2.6; python_version >= \"3.6\"",
+    "selectors2; python_version < \"3.4\"",
     "six>=1.11.0",
 ]
 files = [
@@ -283,19 +273,20 @@ files = [
 
 [[package]]
 name = "flask"
-version = "2.1.3"
-requires_python = ">=3.7"
+version = "3.0.3"
+requires_python = ">=3.8"
 summary = "A simple framework for building complex web applications."
 dependencies = [
-    "Jinja2>=3.0",
-    "Werkzeug>=2.0",
-    "click>=8.0",
+    "Jinja2>=3.1.2",
+    "Werkzeug>=3.0.0",
+    "blinker>=1.6.2",
+    "click>=8.1.3",
     "importlib-metadata>=3.6.0; python_version < \"3.10\"",
-    "itsdangerous>=2.0",
+    "itsdangerous>=2.1.2",
 ]
 files = [
-    {file = "Flask-2.1.3-py3-none-any.whl", hash = "sha256:9013281a7402ad527f8fd56375164f3aa021ecfaff89bfe3825346c24f87e04c"},
-    {file = "Flask-2.1.3.tar.gz", hash = "sha256:15972e5017df0575c3d6c090ba168b6db90259e620ac8d7ea813a396bad5b6cb"},
+    {file = "flask-3.0.3-py3-none-any.whl", hash = "sha256:34e815dfaa43340d1d15a5c3a02b8476004037eb4840b34910c6e21679d288f3"},
+    {file = "flask-3.0.3.tar.gz", hash = "sha256:ceb27b0af3823ea2737928a4d99d125a06175b8512c445cbd9a9ce200ef76842"},
 ]
 
 [[package]]
@@ -436,19 +427,6 @@ dependencies = [
 files = [
     {file = "importlib_metadata-4.12.0-py3-none-any.whl", hash = "sha256:7401a975809ea1fdc658c3aa4f78cc2195a0e019c5cbc4c06122884e9ae80c23"},
     {file = "importlib_metadata-4.12.0.tar.gz", hash = "sha256:637245b8bab2b6502fcbc752cc4b7a6f6243bb02b31c5c26156ad103d3d45670"},
-]
-
-[[package]]
-name = "importlib-resources"
-version = "5.9.0"
-requires_python = ">=3.7"
-summary = "Read resources from Python packages"
-dependencies = [
-    "zipp>=3.1.0; python_version < \"3.10\"",
-]
-files = [
-    {file = "importlib_resources-5.9.0-py3-none-any.whl", hash = "sha256:f78a8df21a79bcc30cfd400bdc38f314333de7c0fb619763f6b9dabab8268bb7"},
-    {file = "importlib_resources-5.9.0.tar.gz", hash = "sha256:5481e97fb45af8dcf2f798952625591c58fe599d0735d86b10f54de086a61681"},
 ]
 
 [[package]]
@@ -776,6 +754,7 @@ requires_python = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,>=2.7"
 summary = "Shims to make deprecation of pytz easier"
 dependencies = [
     "backports-zoneinfo; python_version >= \"3.6\" and python_version < \"3.9\"",
+    "python-dateutil; python_version < \"3.6\"",
     "tzdata; python_version >= \"3.6\"",
 ]
 files = [
@@ -846,25 +825,25 @@ files = [
 
 [[package]]
 name = "quart"
-version = "0.17.0"
-requires_python = ">=3.7"
+version = "0.19.9"
+requires_python = ">=3.8"
 summary = "A Python ASGI web microframework with the same API as Flask"
 dependencies = [
     "aiofiles",
-    "blinker",
-    "click",
+    "blinker>=1.6",
+    "click>=8.0.0",
+    "flask>=3.0.0",
     "hypercorn>=0.11.2",
-    "importlib-metadata; python_version < \"3.8\"",
+    "importlib-metadata; python_version < \"3.10\"",
     "itsdangerous",
     "jinja2",
     "markupsafe",
-    "toml",
-    "typing-extensions; python_version < \"3.8\"",
-    "werkzeug>=2.0.0",
+    "typing-extensions; python_version < \"3.10\"",
+    "werkzeug>=3.0.0",
 ]
 files = [
-    {file = "Quart-0.17.0-py3-none-any.whl", hash = "sha256:69480e7384935feff1f50293a8cb70c5d31f568af94ed792d043bb368b50bd50"},
-    {file = "Quart-0.17.0.tar.gz", hash = "sha256:2cf213d8b83fa701a83e3b3125e9102a937cefd1e97e9583f22ee2fa79139640"},
+    {file = "quart-0.19.9-py3-none-any.whl", hash = "sha256:8acb8b299c72b66ee9e506ae141498bbbfcc250b5298fbdb712e97f3d7e4082f"},
+    {file = "quart-0.19.9.tar.gz", hash = "sha256:30a61a0d7bae1ee13e6e99dc14c929b3c945e372b9445d92d21db053e91e95a5"},
 ]
 
 [[package]]
@@ -874,7 +853,9 @@ requires_python = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, !=3.5.*"
 summary = "Python HTTP for Humans."
 dependencies = [
     "certifi>=2017.4.17",
+    "chardet<5,>=3.0.2; python_version < \"3\"",
     "charset-normalizer~=2.0.0; python_version >= \"3\"",
+    "idna<3,>=2.5; python_version < \"3\"",
     "idna<4,>=2.5; python_version >= \"3\"",
     "urllib3<1.27,>=1.21.1",
 ]
@@ -984,6 +965,9 @@ name = "sniffio"
 version = "1.2.0"
 requires_python = ">=3.5"
 summary = "Sniff out which async library your code is running under"
+dependencies = [
+    "contextvars>=2.1; python_version < \"3.7\"",
+]
 files = [
     {file = "sniffio-1.2.0-py3-none-any.whl", hash = "sha256:471b71698eac1c2112a40ce2752bb2f4a4814c22a54a3eed3676bc0f5ca9f663"},
     {file = "sniffio-1.2.0.tar.gz", hash = "sha256:c4666eecec1d3f50960c6bdf61ab7bc350648da6c126e3cf6898d8cd4ddcd3de"},
@@ -1079,15 +1063,15 @@ files = [
 
 [[package]]
 name = "werkzeug"
-version = "2.2.0"
-requires_python = ">=3.7"
+version = "3.0.6"
+requires_python = ">=3.8"
 summary = "The comprehensive WSGI web application library."
 dependencies = [
     "MarkupSafe>=2.1.1",
 ]
 files = [
-    {file = "Werkzeug-2.2.0-py3-none-any.whl", hash = "sha256:81806f8a5b35e6cb1b39a6f28dabf0e123f069c8596119a1a9a43838870016cd"},
-    {file = "Werkzeug-2.2.0.tar.gz", hash = "sha256:fe8bcdcef40275ed915fc734c2527a39d705b57a716d4f09e790296abbd16a7f"},
+    {file = "werkzeug-3.0.6-py3-none-any.whl", hash = "sha256:1bc0c2310d2fbb07b1dd1105eba2f7af72f322e1e455f2f93c993bee8c8a5f17"},
+    {file = "werkzeug-3.0.6.tar.gz", hash = "sha256:a8dd59d4de28ca70471a34cba79bed5f7ef2e036a76b3ab0835474246eb41f8d"},
 ]
 
 [[package]]

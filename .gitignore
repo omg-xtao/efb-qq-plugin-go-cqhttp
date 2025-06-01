@@ -291,3 +291,4 @@ fabric.properties
 
 # Local History for Visual Studio Code
 .history/
+.pdm-python
