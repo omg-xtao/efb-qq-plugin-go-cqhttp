@@ -349,6 +349,10 @@ class QQMsgProcessor:
         efb_msg = Message(type=MsgType.Text, text=f"QQ红包: {data['title']}")
         return [efb_msg]
 
+    def qq_file_wrapper(self, data, _: Chat = None):
+        # no need to return, the async_download_file and handle_group_file_upload_msg handle it
+        pass
+
     def qq_unsupported_wrapper(self, data, _: Chat = None):
         efb_msg = Message(type=MsgType.Unsupported, text=data)
         return [efb_msg]
