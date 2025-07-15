@@ -103,6 +103,7 @@ class GoCQHttp(BaseClient):
 
         # To keep the compatibility for old config
         self.coolq_api_timeout = self.client_config.get("api_timeout", 60)
+        self.auto_mark_as_read = self.client_config.get("auto_mark_as_read", False)
         self.coolq_bot = CQHttp(
             api_root=self.client_config["api_root"],
             access_token=self.client_config["access_token"],
@@ -374,6 +375,13 @@ class GoCQHttp(BaseClient):
 
                     efb_msg.deliver_to = coordinator.master
                     async_send_messages_to_master(efb_msg)
+
+                if self.auto_mark_as_read:
+                    try:
+                        await self.coolq_api_query("mark_msg_as_read", message_id=coolq_msg_id)
+                        self.logger.debug(f"Marked message {coolq_msg_id} as read")
+                    except Exception as e:
+                        self.logger.warning(f"Failed to mark message {coolq_msg_id} as read: {e}")
 
             asyncio.create_task(_handle_msg())
 
