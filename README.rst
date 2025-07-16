@@ -72,6 +72,7 @@ efb-qq-plugin-go-cqhttp 是 efb-qq-slave 的插件，需要配合 efb-qq-slave �
            api_root: http://127.0.0.1:5700/  # GoCQHttp API接口地址/端口
            api_timeout: 60                   # GoCQHttp API接口超时时间
            auto_mark_as_read: false          # 自动标记为已读，暂时解决部分QQ客户端（特别是手表协议下）在未读消息多的时候丢消息的问题
+           handle_own_messages: true         # 处理来自自己的消息，默认关闭
            host: 127.0.0.1                   # efb-qq-slave 所监听的地址用于接收消息
            port: 8000                        # 同上
 
