@@ -40,7 +40,7 @@ class QQMsgProcessor:
         efb_msg.file = await cq_get_image(data["url"])
         if efb_msg.file is None:
             efb_msg.type = MsgType.Text
-            efb_msg.text = "[Download image failed, please check on your QQ client]"
+            efb_msg.text = f"[Image download failed locally, but receiving platform may still be able to load it]\n{data.get('url', '')}"
             self.logger.warning("Image download failed. URL: %s, File: %s", data.get("url", "N/A"), data.get("file", "N/A"))
             return [efb_msg]
 
@@ -339,11 +339,17 @@ class QQMsgProcessor:
         return [efb_msg]
 
     async def qq_video_wrapper(self, data, _: Chat = None):
-        res = await download_file(data["url"])
-        mime = magic.from_file(res.name, mime=True)
-        if isinstance(mime, bytes):
-            mime = mime.decode()
-        efb_msg = Message(type=MsgType.Video, file=res, filename=res.name, mime=mime)
+        efb_msg = Message()
+        try:
+            res = await download_file(data["url"])
+            mime = magic.from_file(res.name, mime=True)
+            if isinstance(mime, bytes):
+                mime = mime.decode()
+            efb_msg = Message(type=MsgType.Video, file=res, filename=res.name, mime=mime)
+        except Exception:
+            efb_msg.type = MsgType.Text
+            efb_msg.text = f"[Video download failed locally, but receiving platform may still be able to load it]\n{data.get('url', '')}"
+            self.logger.warning("Failed to download video from URL: %s", data.get("url", "N/A"))
         return [efb_msg]
 
     def qq_redbag_wrapper(self, data, _: Chat = None):
