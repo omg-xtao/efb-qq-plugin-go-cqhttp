@@ -661,7 +661,6 @@ async def async_get_file(url: str) -> IO:
                 logger.warning("File download failed.")
                 logger.warning(str(e))
                 raise e
-            await asyncio.sleep(attempt)
 
 
 def sync_get_file(url: str) -> IO:
