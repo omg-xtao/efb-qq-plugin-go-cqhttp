@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import tempfile
 from typing import IO, Optional, Union
@@ -642,18 +643,25 @@ qq_sface_list = {
 
 
 async def async_get_file(url: str) -> IO:
-    temp_file = tempfile.NamedTemporaryFile()
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(url)
-            temp_file.write(resp.content)
-            if temp_file.seek(0, 2) <= 0:
-                raise EOFError("File downloaded is Empty")
-            temp_file.seek(0)
-    except Exception as e:
-        temp_file.close()
-        raise e
-    return temp_file
+    max_retries = 5
+    
+    for attempt in range(1, max_retries + 1):
+        temp_file = tempfile.NamedTemporaryFile()
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(url)
+                temp_file.write(resp.content)
+                if temp_file.seek(0, 2) <= 0:
+                    raise EOFError("File downloaded is Empty")
+                temp_file.seek(0)
+            return temp_file
+        except Exception as e:
+            temp_file.close()
+            if attempt == max_retries:
+                logger.warning("File download failed.")
+                logger.warning(str(e))
+                raise e
+            await asyncio.sleep(attempt)
 
 
 def sync_get_file(url: str) -> IO:

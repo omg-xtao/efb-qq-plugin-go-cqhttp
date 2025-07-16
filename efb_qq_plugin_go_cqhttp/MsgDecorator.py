@@ -41,6 +41,7 @@ class QQMsgProcessor:
         if efb_msg.file is None:
             efb_msg.type = MsgType.Text
             efb_msg.text = "[Download image failed, please check on your QQ client]"
+            self.logger.warning("Image download failed. URL: %s, File: %s", data.get("url", "N/A"), data.get("file", "N/A"))
             return [efb_msg]
 
         efb_msg.type = MsgType.Image
