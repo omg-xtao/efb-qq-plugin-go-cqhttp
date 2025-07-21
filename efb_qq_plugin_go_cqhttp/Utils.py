@@ -1,7 +1,7 @@
-import asyncio
 import logging
 import tempfile
 from typing import IO, Optional, Union
+import re
 
 import httpx
 import pilk
@@ -645,7 +645,8 @@ qq_sface_list = {
 async def async_get_file(url: str) -> IO:
     temp_file = tempfile.NamedTemporaryFile()
     try:
-        async with httpx.AsyncClient() as client:
+        verify_ssl = not re.search(r"(qpic\.cn|[\d\.]+:\d+)", url)
+        async with httpx.AsyncClient(verify=verify_ssl) as client:
             resp = await client.get(url)
             temp_file.write(resp.content)
             if temp_file.seek(0, 2) <= 0:
@@ -660,7 +661,8 @@ async def async_get_file(url: str) -> IO:
 def sync_get_file(url: str) -> IO:
     temp_file = tempfile.NamedTemporaryFile()
     try:
-        resp = httpx.get(url)
+        verify_ssl = not re.search(r"(qpic\.cn|[\d\.]+:\d+)", url)
+        resp = httpx.get(url, verify=verify_ssl)
         temp_file.write(resp.content)
         if temp_file.seek(0, 2) <= 0:
             raise EOFError("File downloaded is Empty")
