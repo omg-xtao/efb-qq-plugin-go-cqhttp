@@ -43,7 +43,7 @@ class QQMsgProcessor:
         except DownloadTooLargeError:
             # Over-limit: return a File-type message with link in text, no file
             placeholder = Message()
-            placeholder.type = MsgType.File
+            placeholder.type = MsgType.Text
             placeholder.filename = data.get("file") or "image"
             limit = getattr(self.inst, "file_size_limit_bytes", 0)
             mb = int(limit / (1024 * 1024)) if limit else 0
@@ -376,7 +376,7 @@ class QQMsgProcessor:
         except DownloadTooLargeError:
             # Over-limit: return a File-type message with link in text, no file
             placeholder = Message()
-            placeholder.type = MsgType.File
+            placeholder.type = MsgType.Text
             placeholder.filename = data.get("file") or "video"
             mb = int(limit / (1024 * 1024)) if limit else 0
             placeholder.text = f"[Video exceeds size limit ({mb} MB). Not auto-downloaded]\n{data.get('url','')}"

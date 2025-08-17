@@ -1449,7 +1449,7 @@ class GoCQHttp(BaseClient):
         kind: 'File' | 'Image' | 'Video' etc. For annotation only.
         """
         efb_msg = Message()
-        efb_msg.type = MsgType.File
+        efb_msg.type = MsgType.Text
         efb_msg.filename = original_name or kind.lower()
         mb = self._bytes_to_mb(self.file_size_limit_bytes)
         efb_msg.text = f"[{kind} exceeds size limit ({mb} MB). Not auto-downloaded]\n{download_url}"
