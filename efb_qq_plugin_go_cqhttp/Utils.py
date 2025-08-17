@@ -642,6 +642,10 @@ qq_sface_list = {
 }
 
 
+class DownloadTooLargeError(Exception):
+    """Raised when a download exceeds the configured size limit."""
+
+
 async def async_get_file(url: str) -> IO:
     temp_file = tempfile.NamedTemporaryFile()
     try:
@@ -655,6 +659,44 @@ async def async_get_file(url: str) -> IO:
     except Exception as e:
         temp_file.close()
         raise e
+    return temp_file
+
+
+async def async_get_file_with_limit(url: str, max_bytes: Optional[int] = None) -> IO:
+    """
+    Stream download a file with an optional byte ceiling.
+    Raises DownloadTooLargeError if Content-Length > max_bytes or streamed bytes exceed max_bytes.
+    """
+    temp_file = tempfile.NamedTemporaryFile()
+    try:
+        verify_ssl = not re.search(r"(qpic\.cn|[\d\.]+:\d+)", url)
+        timeout = httpx.Timeout(30.0, connect=10.0)
+        async with httpx.AsyncClient(verify=verify_ssl, timeout=timeout) as client:
+            async with client.stream("GET", url) as resp:
+                resp.raise_for_status()
+                cl = resp.headers.get("Content-Length")
+                if max_bytes is not None and cl is not None:
+                    try:
+                        if int(cl) > max_bytes:
+                            raise DownloadTooLargeError(f"Content-Length {cl} exceeds limit {max_bytes}")
+                    except ValueError:
+                        pass  # malformed header; ignore and stream-check
+
+                total = 0
+                async for chunk in resp.aiter_bytes(chunk_size=65536):
+                    if not chunk:
+                        continue
+                    total += len(chunk)
+                    if max_bytes is not None and total > max_bytes:
+                        raise DownloadTooLargeError(f"Downloaded {total} exceeds limit {max_bytes}")
+                    temp_file.write(chunk)
+
+                if temp_file.seek(0, 2) <= 0:
+                    raise EOFError("File downloaded is Empty")
+                temp_file.seek(0)
+    except Exception:
+        temp_file.close()
+        raise
     return temp_file
 
 
@@ -673,13 +715,18 @@ def sync_get_file(url: str) -> IO:
     return temp_file
 
 
-async def cq_get_image(image_link: str) -> Optional[IO]:
+async def cq_get_image(image_link: str, max_bytes: Optional[int] = None) -> Optional[IO]:
     """
-    Download image from QQ
+    Download image from QQ with optional size limit.
     """
 
     try:
-        return await async_get_file(image_link)
+        if max_bytes is None:
+            return await async_get_file(image_link)
+        return await async_get_file_with_limit(image_link, max_bytes=max_bytes)
+    except DownloadTooLargeError:
+        # Caller will handle over-limit by sending a placeholder message
+        raise
     except Exception as e:
         logger.warning("File download failed.")
         logger.warning(str(e))
@@ -758,6 +805,13 @@ async def download_file(download_url: str) -> Union[IO, str]:
     except Exception as e:
         logger.warning("Error occurs when downloading files: " + str(e))
         return "Error occurs when downloading files: " + str(e)
+
+
+async def download_file_with_limit(download_url: str, max_bytes: int) -> IO:
+    """
+    Download with size ceiling; raises DownloadTooLargeError on exceed, or other exceptions on error.
+    """
+    return await async_get_file_with_limit(download_url, max_bytes=max_bytes)
 
 
 def download_user_avatar(uid: str):

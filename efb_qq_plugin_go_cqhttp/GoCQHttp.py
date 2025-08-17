@@ -46,11 +46,13 @@ from .Utils import (
     async_send_messages_to_master,
     coolq_text_encode,
     download_file,
+    download_file_with_limit,
     download_group_avatar,
     download_user_avatar,
     process_quote_text,
     qq_emoji_list,
     strf_time,
+    DownloadTooLargeError,
 )
 
 
@@ -106,6 +108,9 @@ class GoCQHttp(BaseClient):
         self.coolq_api_timeout = self.client_config.get("api_timeout", 60)
         self.auto_mark_as_read = self.client_config.get("auto_mark_as_read", False)
         self.handle_own_messages = self.client_config.get("handle_own_messages", False)
+        
+        # File size limit with default 50 MB
+        self.file_size_limit_bytes: int = int(self.client_config.get("file_size_limit_mb", 50)) * 1024 * 1024
         
         # Apply monkey patch for message_sent events if enabled
         if self.handle_own_messages:
@@ -544,6 +549,19 @@ class GoCQHttp(BaseClient):
                 text = text.format(remark=user["remark"], nickname=user["nickname"]) + file_info_msg
                 context["message"] = text
                 self.send_msg_to_master(context)
+
+                # Size check gate
+                size = context.get("file", {}).get("size")
+                if isinstance(size, int) and size > self.file_size_limit_bytes:
+                    await self._send_placeholder_file_message(
+                        context=context,
+                        download_url=context["file"]["url"],
+                        original_name=context["file"].get("name", "file"),
+                        kind="File",
+                    )
+                    return
+
+                # Proceed with download for files within limit
                 param_dict = {
                     "context": context,
                     "download_url": context["file"]["url"],
@@ -574,6 +592,33 @@ class GoCQHttp(BaseClient):
                 context["message"] = text
                 await self.send_efb_group_notice(context)
 
+                # Size check gate
+                size = context.get("file", {}).get("size")
+                if isinstance(size, int) and size > self.file_size_limit_bytes:
+                    # Fetch URL only, no byte download
+                    try:
+                        file_meta = await self.coolq_api_query(
+                            "get_group_file_url",
+                            group_id=context["group_id"],
+                            file_id=context["file"]["id"],
+                            busid=context["file"]["busid"],
+                        )
+                        download_url = file_meta["url"]
+                    except Exception:
+                        # Fallback: cannot obtain URL
+                        context["message"] = "[File exceeds size limit and download URL cannot be retrieved]"
+                        await self.send_efb_group_notice(context)
+                        return
+
+                    await self._send_placeholder_file_message(
+                        context=context,
+                        download_url=download_url,
+                        original_name=context["file"].get("name", "file"),
+                        kind="File",
+                    )
+                    return
+
+                # Proceed with download for files within limit
                 param_dict = {
                     "context": context,
                     "group_id": context["group_id"],
@@ -1391,26 +1436,72 @@ class GoCQHttp(BaseClient):
             return "Failed to process request! Error Message:\n" + getattr(e, "message", repr(e))
         return "Done"
 
-    async def async_download_file(self, context, download_url):
-        res = await download_file(download_url)
-        if isinstance(res, str):
-            context["message"] = ("[Download] ") + res
-            await self.send_efb_group_notice(context)
-        elif res is None:
-            pass
+    def _bytes_to_mb(self, n: int) -> int:
+        """Convert bytes to MB, rounded."""
+        try:
+            return int(round(n / (1024 * 1024)))
+        except Exception:
+            return 0
+
+    async def _send_placeholder_file_message(self, context: Dict[str, Any], download_url: str, original_name: str, kind: str):
+        """
+        Send a File-type EFB message with link in text and no file content.
+        kind: 'File' | 'Image' | 'Video' etc. For annotation only.
+        """
+        efb_msg = Message()
+        efb_msg.type = MsgType.File
+        efb_msg.filename = original_name or kind.lower()
+        mb = self._bytes_to_mb(self.file_size_limit_bytes)
+        efb_msg.text = f"[{kind} exceeds size limit ({mb} MB). Not auto-downloaded]\n{download_url}"
+
+        # Bind chat & author like normal path
+        if context.get("uid_prefix") == "offline_file":
+            efb_msg.chat = await self.chat_manager.build_efb_chat_as_private(context)
+        elif context.get("uid_prefix") == "group_upload":
+            efb_msg.chat = await self.chat_manager.build_efb_chat_as_group(context)
         else:
-            data = {"file": res, "filename": context["file"]["name"]}
-            context["message_type"] = "group"
-            efb_msg = self.msg_decorator.qq_file_after_wrapper(data)
-            efb_msg.uid = str(context["user_id"]) + "_" + str(uuid.uuid4()) + "_" + str(1)
-            efb_msg.text = "Sent a file\n{}".format(context["file"]["name"])
-            if context["uid_prefix"] == "offline_file":
-                efb_msg.chat = await self.chat_manager.build_efb_chat_as_private(context)
-            elif context["uid_prefix"] == "group_upload":
+            # fallback: infer from context
+            if "group_id" in context:
                 efb_msg.chat = await self.chat_manager.build_efb_chat_as_group(context)
-            efb_msg.author = await self.chat_manager.build_or_get_efb_member(efb_msg.chat, context)
-            efb_msg.deliver_to = coordinator.master
-            async_send_messages_to_master(efb_msg)
+            else:
+                efb_msg.chat = await self.chat_manager.build_efb_chat_as_private(context)
+
+        efb_msg.author = await self.chat_manager.build_or_get_efb_member(efb_msg.chat, context)
+        efb_msg.uid = str(context.get("user_id", "")) + "_" + str(uuid.uuid4()) + "_1"
+        efb_msg.deliver_to = coordinator.master
+        async_send_messages_to_master(efb_msg)
+
+    async def async_download_file(self, context, download_url):
+        try:
+            # Defensive limit in case upstream metadata was wrong
+            res = await download_file_with_limit(download_url, max_bytes=self.file_size_limit_bytes)
+        except DownloadTooLargeError:
+            await self._send_placeholder_file_message(
+                context=context,
+                download_url=download_url,
+                original_name=context.get("file", {}).get("name", "file"),
+                kind="File",
+            )
+            return
+        except Exception as e:
+            context["message"] = "[Download] Error occurs when downloading files: " + str(e)
+            await self.send_efb_group_notice(context)
+            return
+
+        if res is None:
+            return
+        data = {"file": res, "filename": context["file"]["name"]}
+        context["message_type"] = "group"
+        efb_msg = self.msg_decorator.qq_file_after_wrapper(data)
+        efb_msg.uid = str(context["user_id"]) + "_" + str(uuid.uuid4()) + "_" + str(1)
+        efb_msg.text = "Sent a file\n{}".format(context["file"]["name"])
+        if context["uid_prefix"] == "offline_file":
+            efb_msg.chat = await self.chat_manager.build_efb_chat_as_private(context)
+        elif context["uid_prefix"] == "group_upload":
+            efb_msg.chat = await self.chat_manager.build_efb_chat_as_group(context)
+        efb_msg.author = await self.chat_manager.build_or_get_efb_member(efb_msg.chat, context)
+        efb_msg.deliver_to = coordinator.master
+        async_send_messages_to_master(efb_msg)
 
     async def async_download_group_file(self, context, group_id, file_id, busid):
         file = await self.coolq_api_query("get_group_file_url", group_id=group_id, file_id=file_id, busid=busid)

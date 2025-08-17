@@ -10,7 +10,7 @@ import magic
 from ehforwarderbot import Chat, Message, MsgType
 from ehforwarderbot.message import LinkAttribute, LocationAttribute, Substitutions
 
-from .Utils import cq_get_image, download_file, download_voice
+from .Utils import cq_get_image, download_file, download_voice, download_file_with_limit, DownloadTooLargeError
 
 if TYPE_CHECKING:
     from .GoCQHttp import GoCQHttp
@@ -37,14 +37,27 @@ class QQMsgProcessor:
             )
             efb_msg.text = "Send a flash picture."
 
-        efb_msg.file = await cq_get_image(data["url"])
-        if efb_msg.file is None:
+        try:
+            limit = getattr(self.inst, "file_size_limit_bytes", None)
+            efb_file = await cq_get_image(data["url"], max_bytes=limit) if limit else await cq_get_image(data["url"])
+        except DownloadTooLargeError:
+            # Over-limit: return a File-type message with link in text, no file
+            placeholder = Message()
+            placeholder.type = MsgType.File
+            placeholder.filename = data.get("file") or "image"
+            limit = getattr(self.inst, "file_size_limit_bytes", 0)
+            mb = int(limit / (1024 * 1024)) if limit else 0
+            placeholder.text = f"[Image exceeds size limit ({mb} MB). Not auto-downloaded]\n{data.get('url','')}"
+            return [placeholder]
+
+        if efb_file is None:
             efb_msg.type = MsgType.Text
             efb_msg.text = f"[Image download failed locally, but receiving platform may still be able to load it]\n{data.get('url', '')}"
             self.logger.warning("Image download failed. URL: %s, File: %s", data.get("url", "N/A"), data.get("file", "N/A"))
             return [efb_msg]
 
         efb_msg.type = MsgType.Image
+        efb_msg.file = efb_file
         mime = magic.from_file(efb_msg.file.name, mime=True)
         if isinstance(mime, bytes):
             mime = mime.decode()
@@ -339,18 +352,41 @@ class QQMsgProcessor:
         return [efb_msg]
 
     async def qq_video_wrapper(self, data, _: Chat = None):
-        efb_msg = Message()
+        limit = getattr(self.inst, "file_size_limit_bytes", None)
+        
         try:
-            res = await download_file(data["url"])
+            if limit:
+                res = await download_file_with_limit(data["url"], max_bytes=limit)
+            else:
+                res = await download_file(data["url"])
+            
+            # download_file can return a string on error, check for that
+            if isinstance(res, str):
+                efb_msg = Message()
+                efb_msg.type = MsgType.Text
+                efb_msg.text = f"[Video download failed locally, but receiving platform may still be able to load it]\n{data.get('url', '')}"
+                self.logger.warning("Failed to download video from URL: %s", data.get("url", "N/A"))
+                return [efb_msg]
+            
             mime = magic.from_file(res.name, mime=True)
             if isinstance(mime, bytes):
                 mime = mime.decode()
             efb_msg = Message(type=MsgType.Video, file=res, filename=res.name, mime=mime)
+            return [efb_msg]
+        except DownloadTooLargeError:
+            # Over-limit: return a File-type message with link in text, no file
+            placeholder = Message()
+            placeholder.type = MsgType.File
+            placeholder.filename = data.get("file") or "video"
+            mb = int(limit / (1024 * 1024)) if limit else 0
+            placeholder.text = f"[Video exceeds size limit ({mb} MB). Not auto-downloaded]\n{data.get('url','')}"
+            return [placeholder]
         except Exception:
+            efb_msg = Message()
             efb_msg.type = MsgType.Text
             efb_msg.text = f"[Video download failed locally, but receiving platform may still be able to load it]\n{data.get('url', '')}"
             self.logger.warning("Failed to download video from URL: %s", data.get("url", "N/A"))
-        return [efb_msg]
+            return [efb_msg]
 
     def qq_redbag_wrapper(self, data, _: Chat = None):
         efb_msg = Message(type=MsgType.Text, text=f"QQ红包: {data['title']}")
