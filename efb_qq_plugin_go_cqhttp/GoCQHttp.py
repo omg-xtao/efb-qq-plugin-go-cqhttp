@@ -55,6 +55,7 @@ from .Utils import (
     DownloadTooLargeError,
 )
 
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 class GoCQHttp(BaseClient):
     """
