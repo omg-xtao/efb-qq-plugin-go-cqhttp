@@ -56,6 +56,7 @@ from .Utils import (
 )
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("aiocqhttp").setLevel(logging.WARNING)
 
 class GoCQHttp(BaseClient):
     """
