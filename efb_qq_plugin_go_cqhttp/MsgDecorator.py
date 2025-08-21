@@ -384,7 +384,7 @@ class QQMsgProcessor:
         except Exception:
             efb_msg = Message()
             efb_msg.type = MsgType.Text
-            efb_msg.text = f"[Video download failed locally, but receiving platform may still be able to load it]\n{data.get('url', '')}"
+            efb_msg.text = f"[Video download failed]\n{data.get('url', '')}"
             self.logger.warning("Failed to download video from URL: %s", data.get("url", "N/A"))
             return [efb_msg]
 

@@ -1445,16 +1445,21 @@ class GoCQHttp(BaseClient):
         except Exception:
             return 0
 
-    async def _send_placeholder_file_message(self, context: Dict[str, Any], download_url: str, original_name: str, kind: str):
+    async def _send_placeholder_file_message(self, context: Dict[str, Any], download_url: str, original_name: str, kind: str, reason: str = "exceeds size limit"):
         """
-        Send a File-type EFB message with link in text and no file content.
+        Send a text EFB message with a link to a file.
         kind: 'File' | 'Image' | 'Video' etc. For annotation only.
+        reason: Text to explain why the file is not attached.
         """
         efb_msg = Message()
         efb_msg.type = MsgType.Text
         efb_msg.filename = original_name or kind.lower()
-        mb = self._bytes_to_mb(self.file_size_limit_bytes)
-        efb_msg.text = f"[{kind} exceeds size limit ({mb} MB). Not auto-downloaded]\n{download_url}"
+        if "exceeds size limit" in reason:
+            mb = self._bytes_to_mb(self.file_size_limit_bytes)
+            reason_text = f"exceeds size limit ({mb} MB)"
+        else:
+            reason_text = reason
+        efb_msg.text = f"[{kind} {reason_text}]\n{download_url}"
 
         # Bind chat & author like normal path
         if context.get("uid_prefix") == "offline_file":
@@ -1486,8 +1491,14 @@ class GoCQHttp(BaseClient):
             )
             return
         except Exception as e:
-            context["message"] = "[Download] Error occurs when downloading files: " + str(e)
-            await self.send_efb_group_notice(context)
+            self.logger.warning(f"Failed to download file from {download_url}: {e}")
+            await self._send_placeholder_file_message(
+                context=context,
+                download_url=download_url,
+                original_name=context.get("file", {}).get("name", "file"),
+                kind="File",
+                reason="download failed"
+            )
             return
 
         if res is None:
