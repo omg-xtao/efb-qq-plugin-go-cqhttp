@@ -4,6 +4,7 @@ from typing import IO, Optional, Union
 import re
 
 import httpx
+import urllib.parse
 import pilk
 import pydub
 from ehforwarderbot import Message, coordinator
@@ -662,12 +663,16 @@ async def async_get_file(url: str) -> IO:
     return temp_file
 
 
-async def async_get_file_with_limit(url: str, max_bytes: Optional[int] = None) -> IO:
+async def async_get_file_with_limit(url: str, max_bytes: Optional[int] = None, errcount: int = 0) -> IO:
     """
     Stream download a file with an optional byte ceiling.
     Raises DownloadTooLargeError if Content-Length > max_bytes or streamed bytes exceed max_bytes.
     """
     temp_file = tempfile.NamedTemporaryFile()
+    if errcount > 2:
+        logger.error(f"Max retries exceeded for {url}")
+        temp_file.close()
+        raise httpx.HTTPError("Max retries exceeded")
     try:
         verify_ssl = not re.search(r"(qpic\.cn|[\d\.]+:\d+)", url)
         timeout = httpx.Timeout(30.0, connect=10.0)
@@ -694,9 +699,41 @@ async def async_get_file_with_limit(url: str, max_bytes: Optional[int] = None) -
                 if temp_file.seek(0, 2) <= 0:
                     raise EOFError("File downloaded is Empty")
                 temp_file.seek(0)
-    except Exception:
-        temp_file.close()
-        raise
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 400:
+            logger.warning(f"Appid mismatch for {url}, attempting retry with alternative appid.")
+            # Extract appid from the URL
+            parsed_url = urllib.parse.urlparse(url)
+            query_params = urllib.parse.parse_qs(parsed_url.query)
+
+            original_appid = query_params.get("appid", [None])[0]
+            
+            # Determine the alternative appid
+            alternative_appid = None
+            if original_appid == "1407":
+                alternative_appid = "1406"
+            elif original_appid == "1406":
+                alternative_appid = "1407"
+
+            if alternative_appid:
+                current_query_params = query_params.copy()
+                current_query_params["appid"] = [alternative_appid]
+                
+                # Reconstruct the URL with the alternative appid
+                new_query_string = urllib.parse.urlencode(current_query_params, doseq=True)
+                new_image_link = parsed_url._replace(query=new_query_string).geturl()
+                
+                try:
+                    temp_file = await async_get_file_with_limit(new_image_link, max_bytes=max_bytes, errcount=errcount + 1)
+                    return temp_file
+                except Exception as e:
+                    logger.error(f"Failed to download image with alternative appid: {e}")
+    except Exception as e:
+        logger.error(f"Unexpected error for {url}: {e}")
+        try:
+            await async_get_file_with_limit(url, max_bytes=max_bytes, errcount=errcount + 1)
+        except Exception as e:
+            logger.error(f"Failed to download image with alternative appid: {e}")
     return temp_file
 
 
@@ -730,6 +767,7 @@ async def cq_get_image(image_link: str, max_bytes: Optional[int] = None) -> Opti
     except Exception as e:
         logger.warning("File download failed.")
         logger.warning(str(e))
+        logger.warning(f"URL: {image_link}")
         return None
 
 
