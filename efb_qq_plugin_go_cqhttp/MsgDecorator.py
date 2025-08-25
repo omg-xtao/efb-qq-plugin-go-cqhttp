@@ -316,6 +316,137 @@ class QQMsgProcessor:
                     preview=meta_detail1["preview"],
                 )
 
+            # Tencent mini App (lua version)
+            elif dict_data["app"] == "com.tencent.miniapp.lua":
+                meta_miniapp = dict_data["meta"]["miniapp"]
+                bizsrc = dict_data.get("bizsrc", "")
+
+                if bizsrc == "groupalbum.upload":
+                    # 群相册
+                    preview = meta_miniapp.get("preview", "")
+                    urls = [preview, meta_miniapp.get("jumpUrl", "")] if preview else [meta_miniapp.get("jumpUrl", "")]
+                    urls = [url for url in urls if url]  # Remove empty URLs
+                    efb_msg.text = "【群相册】\n\n{title}\n\n{urls}".format(
+                        title=meta_miniapp["title"],
+                        urls="\n".join(urls)
+                    )
+                elif bizsrc == "qzone.shuoshuosharepicture":
+                    # QQ空间说说分享
+                    preview = meta_miniapp.get("preview", "")
+                    jumpUrl = meta_miniapp.get("jumpUrl", meta_miniapp.get("legacyUrl", ""))
+                    urls = [preview, jumpUrl] if preview else [jumpUrl]
+                    urls = [url for url in urls if url]  # Remove empty URLs
+                    efb_msg.text = "【{tag}】\n\n{title}\n\n{urls}".format(
+                        tag=meta_miniapp.get("tag", "QQ空间"),
+                        title=meta_miniapp["title"],
+                        urls="\n".join(urls)
+                    )
+                elif bizsrc == "qzone.albumshare":
+                    # QQ空间相册分享
+                    preview = meta_miniapp.get("preview", "")
+                    jumpUrl = meta_miniapp.get("jumpUrl", "")
+                    urls = [preview, jumpUrl] if preview else [jumpUrl]
+                    urls = [url for url in urls if url]  # Remove empty URLs
+                    efb_msg.text = "【{tag}】\n\n{title}\n\n{urls}".format(
+                        tag=meta_miniapp.get("tag", "QQ空间相册"),
+                        title=meta_miniapp["title"],
+                        urls="\n".join(urls)
+                    )
+                elif bizsrc == "miniapp.nativeshare":
+                    # 微信小程序
+                    preview = meta_miniapp.get("preview", "")
+                    jumpUrl = meta_miniapp.get("jumpUrl", "")
+                    urls = [preview, jumpUrl] if preview else [jumpUrl]
+                    urls = [url for url in urls if url]  # Remove empty URLs
+                    efb_msg.text = "【{tag}】\n\n{title}\n来源：{source}\n\n{urls}".format(
+                        tag=meta_miniapp["tag"],
+                        title=meta_miniapp["title"],
+                        source=meta_miniapp["source"],
+                        urls="\n".join(urls)
+                    )
+                else:
+                    # Generic mini app
+                    preview = meta_miniapp.get("preview", "")
+                    jumpUrl = meta_miniapp.get("jumpUrl", "")
+                    urls = [preview, jumpUrl] if preview else [jumpUrl]
+                    urls = [url for url in urls if url]  # Remove empty URLs
+                    efb_msg.text = "【{tag}】\n\n{title}\n\n{urls}".format(
+                        tag=meta_miniapp.get("tag", "小程序"),
+                        title=meta_miniapp["title"],
+                        urls="\n".join(urls)
+                    )
+
+            # 图文
+            elif dict_data["app"] == "com.tencent.tuwen.lua":
+                bizsrc = dict_data.get("bizsrc", "")
+                meta_news = dict_data["meta"]["news"]
+                
+                if bizsrc == "groupalbum.interact":
+                    # 群相册交互
+                    preview = meta_news.get("preview", "")
+                    jumpUrl = meta_news.get("jumpUrl", "")
+                    urls = [preview, jumpUrl] if preview else [jumpUrl]
+                    urls = [url for url in urls if url]  # Remove empty URLs
+                    efb_msg.text = "【群相册】\n\n{title}\n{desc}\n\n{urls}".format(
+                        title=meta_news["title"],
+                        desc=meta_news["desc"],
+                        urls="\n".join(urls)
+                    )
+                else:
+                    # 其他
+                    tag = meta_news.get("tag", "链接")
+                    title = meta_news["title"]
+                    desc = meta_news.get("desc", "")
+                    jumpUrl = meta_news["jumpUrl"]
+                    preview = meta_news.get("preview", "")
+                    
+                    urls = [preview, jumpUrl] if preview else [jumpUrl]
+                    urls = [url for url in urls if url]  # Remove empty URLs
+
+                    efb_msg.text = "[分享] 【{tag}】\n\n{title}\n{desc}\n\n{urls}".format(
+                        tag=tag, title=title, desc=desc, urls="\n".join(urls)
+                    )
+
+            # 音乐
+            elif dict_data["app"] == "com.tencent.music.lua":
+                meta_music = dict_data["meta"]["music"]
+                preview = meta_music.get("preview", "")
+                jumpUrl = meta_music.get("jumpUrl", "")
+                urls = [preview, jumpUrl] if preview else [jumpUrl]
+                urls = [url for url in urls if url]  # Remove empty URLs
+                efb_msg.text = "🎵 【{tag}】\n\n{title}\n{desc}\n\n{urls}".format(
+                    tag=meta_music.get("tag", "音乐"),
+                    title=meta_music["title"],
+                    desc=meta_music.get("desc", ""),
+                    urls="\n".join(urls)
+                )
+
+            # QQ频道
+            elif dict_data["app"] == "com.tencent.forum":
+                meta_detail = dict_data["meta"]["detail"]
+                channel_info = meta_detail.get("channel_info", {})
+                feed = meta_detail.get("feed", {})
+                
+                feed_text = ""
+                if "contents" in feed and "contents" in feed["contents"]:
+                    for content in feed["contents"]["contents"]:
+                        if content["type"] == 1 and "text_content" in content:
+                            feed_text += content["text_content"]["text"]
+                
+                efb_msg.text = "【频道帖子】\n\n频道：{channel_name}\n群组：{guild_name}\n\n{text}\n\n{jump_url}".format(
+                    channel_name=channel_info.get("channel_name", ""),
+                    guild_name=channel_info.get("guild_name", ""),
+                    text=feed_text,
+                    jump_url=meta_detail.get("jump_url", "")
+                )
+
+            elif dict_data["app"] == "com.tencent.postguidance":
+                meta_invite = dict_data["meta"]["invite"]
+                efb_msg.text = "【{tag}】\n\n{title}".format(
+                    tag=meta_invite.get("tag", "群帖子"),
+                    title=meta_invite["title"]
+                )
+
             # Tencent group photo upload
             elif dict_data["app"] == "com.tencent.groupphoto":
                 album_name = dict_data["meta"]["albumData"]["title"]
@@ -330,11 +461,14 @@ class QQMsgProcessor:
             # Shared third-party Apps
             elif dict_data["app"] == "com.tencent.structmsg":
                 meta_view = dict_data["meta"][dict_data["view"]]
-                efb_msg.text = "{prompt}\n\n{desc}\n\n{url}\n\n{preview}".format(
+                preview = meta_view.get("preview", "")
+                jumpUrl = meta_view.get("jumpUrl", "")
+                urls = [preview, jumpUrl] if preview else [jumpUrl]
+                urls = [url for url in urls if url]  # Remove empty URLs
+                efb_msg.text = "{prompt}\n\n{desc}\n\n{urls}".format(
                     prompt=dict_data["prompt"],
                     desc=meta_view["desc"],
-                    url=meta_view["jumpUrl"],
-                    preview=meta_view["preview"],
+                    urls="\n".join(urls),
                 )
 
             elif dict_data["app"] == "com.tencent.map":
