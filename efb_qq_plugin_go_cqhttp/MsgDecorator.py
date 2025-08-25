@@ -398,9 +398,8 @@ class QQMsgProcessor:
                     title = meta_news["title"]
                     desc = meta_news.get("desc", "")
                     jumpUrl = meta_news["jumpUrl"]
-                    preview = meta_news.get("preview", "")
                     
-                    urls = [preview, jumpUrl] if preview else [jumpUrl]
+                    urls = [jumpUrl]
                     urls = [url for url in urls if url]  # Remove empty URLs
 
                     efb_msg.text = "[分享] 【{tag}】\n\n{title}\n{desc}\n\n{urls}".format(
@@ -410,15 +409,11 @@ class QQMsgProcessor:
             # 音乐
             elif dict_data["app"] == "com.tencent.music.lua":
                 meta_music = dict_data["meta"]["music"]
-                preview = meta_music.get("preview", "")
-                jumpUrl = meta_music.get("jumpUrl", "")
-                urls = [preview, jumpUrl] if preview else [jumpUrl]
-                urls = [url for url in urls if url]  # Remove empty URLs
-                efb_msg.text = "🎵 【{tag}】\n\n{title}\n{desc}\n\n{urls}".format(
-                    tag=meta_music.get("tag", "音乐"),
+                musicUrl = meta_music.get("musicUrl", "")
+                efb_msg.text = "[{title}]({musicUrl})\n{desc}".format(
                     title=meta_music["title"],
+                    musicUrl=musicUrl,
                     desc=meta_music.get("desc", ""),
-                    urls="\n".join(urls)
                 )
 
             # QQ频道
