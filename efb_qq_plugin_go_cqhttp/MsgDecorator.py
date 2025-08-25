@@ -71,6 +71,10 @@ class QQMsgProcessor:
 
     async def qq_record_wrapper(self, data, _: Chat = None):  # Experimental!
         efb_msg = Message()
+        if not data["url"].startswith(("http://", "https://")) or  "." not in data["url"]:
+            efb_msg.type = MsgType.Text
+            efb_msg.text = "[Voice Message] Invalid URL"
+            return [efb_msg]
         try:
             efb_msg.type = MsgType.Audio
             efb_msg.file = await download_voice(data["url"])
