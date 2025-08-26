@@ -486,25 +486,24 @@ class QQMsgProcessor:
 
     async def qq_video_wrapper(self, data, _: Chat = None):
         limit = getattr(self.inst, "file_size_limit_bytes", None)
-        
+
         try:
             if limit:
-                res = await download_file_with_limit(data["url"], max_bytes=limit)
+                efb_file = await download_file_with_limit(data["url"], max_bytes=limit)
             else:
-                res = await download_file(data["url"])
-            
-            # download_file can return a string on error, check for that
-            if isinstance(res, str):
+                efb_file = await download_file(data["url"])
+
+            if efb_file is None:
                 efb_msg = Message()
                 efb_msg.type = MsgType.Text
                 efb_msg.text = f"[Video download failed locally, but receiving platform may still be able to load it]\n{data.get('url', '')}"
                 self.logger.warning("Failed to download video from URL: %s", data.get("url", "N/A"))
                 return [efb_msg]
-            
-            mime = magic.from_file(res.name, mime=True)
+
+            mime = magic.from_file(efb_file.name, mime=True)
             if isinstance(mime, bytes):
                 mime = mime.decode()
-            efb_msg = Message(type=MsgType.Video, file=res, filename=res.name, mime=mime)
+            efb_msg = Message(type=MsgType.Video, file=efb_file, filename=efb_file.name, mime=mime)
             return [efb_msg]
         except DownloadTooLargeError:
             # Over-limit: return a File-type message with link in text, no file
