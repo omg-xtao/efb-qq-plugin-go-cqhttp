@@ -526,7 +526,7 @@ class QQMsgProcessor:
 
     def qq_file_wrapper(self, data, _: Chat = None):
         # no need to return, the async_download_file and handle_group_file_upload_msg handle it
-        pass
+        return []
 
     def qq_unsupported_wrapper(self, data, _: Chat = None):
         efb_msg = Message(type=MsgType.Unsupported, text=data)
