@@ -486,7 +486,7 @@ class QQMsgProcessor:
 
     async def qq_video_wrapper(self, data, _: Chat = None):
         limit = getattr(self.inst, "file_size_limit_bytes", None)
-
+        efb_msg = Message()
         try:
             if limit:
                 efb_file = await download_file_with_limit(data["url"], max_bytes=limit)
@@ -494,31 +494,31 @@ class QQMsgProcessor:
                 efb_file = await download_file(data["url"])
 
             if efb_file is None:
-                efb_msg = Message()
                 efb_msg.type = MsgType.Text
                 efb_msg.text = f"[Video download failed locally, but receiving platform may still be able to load it]\n{data.get('url', '')}"
                 self.logger.warning("Failed to download video from URL: %s", data.get("url", "N/A"))
                 return [efb_msg]
 
-            mime = magic.from_file(efb_file.name, mime=True)
+            efb_msg.type = MsgType.Video
+            efb_msg.file = efb_file
+            mime = magic.from_file(efb_msg.file.name, mime=True)
             if isinstance(mime, bytes):
                 mime = mime.decode()
-            efb_msg = Message(type=MsgType.Video, file=efb_file, filename=efb_file.name, mime=mime)
-            return [efb_msg]
+            efb_msg.filename = data["file"] if "file" in data else efb_msg.file.name
+            efb_msg.filename += "." + str(mime).split("/")[1]
+            efb_msg.path = efb_msg.file.name
+            efb_msg.mime = mime
         except DownloadTooLargeError:
             # Over-limit: return a File-type message with link in text, no file
-            placeholder = Message()
-            placeholder.type = MsgType.Text
-            placeholder.filename = data.get("file") or "video"
+            efb_msg.type = MsgType.Text
+            efb_msg.filename = data.get("file") or "video"
             mb = int(limit / (1024 * 1024)) if limit else 0
-            placeholder.text = f"[Video exceeds size limit ({mb} MB). Not auto-downloaded]\n{data.get('url','')}"
-            return [placeholder]
+            efb_msg.text = f"[Video exceeds size limit ({mb} MB). Not auto-downloaded]\n{data.get('url','')}"
         except Exception:
-            efb_msg = Message()
             efb_msg.type = MsgType.Text
             efb_msg.text = f"[Video download failed]\n{data.get('url', '')}"
             self.logger.warning("Failed to download video from URL: %s", data.get("url", "N/A"))
-            return [efb_msg]
+        return [efb_msg]
 
     def qq_redbag_wrapper(self, data, _: Chat = None):
         efb_msg = Message(type=MsgType.Text, text=f"QQ红包: {data['title']}")
