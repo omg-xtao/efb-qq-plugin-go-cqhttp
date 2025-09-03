@@ -138,25 +138,44 @@ class GoCQHttp(BaseClient):
 
         asyncio.set_event_loop(self.loop)
 
-        async def forward_msgs_wrapper(msg_elements: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-            fmt_msgs: List[Dict] = []
-            for msg in msg_elements:
+        async def _prepare_forward_message_header(msg: Dict[str, Any], content_list_key: str) -> Dict:
+            """准备消息头部"""
+            if content_list_key == "content":
                 from_user = await self.get_user_info(msg["sender"]["user_id"])
                 remark = str(from_user.get("remark", ""))
                 nickname = str(from_user.get("nickname", ""))
-                content_list = msg.get("content", [])
-                header_text = {"data": {"text": f"{remark}（{nickname}）：\n"}, "type": "text"}
-                if not any((c.get("data", {}).get("text", "").strip()) for c in content_list) or (remark == nickname == 1094950020):
-                    header_text = {"data": {"text": ""}, "type": "text"}
+
+                if not any((c.get("data", {}).get("text", "").strip()) for c in msg.get("content", [])) or (remark == nickname == "1094950020"):
+                    return {"data": {"text": ""}, "type": "text"}
+
+                return {"data": {"text": f"{remark}（{nickname}）：\n"}, "type": "text"}
+            else:
+                remark = msg["sender"]["nickname"]
+                nickname = msg["sender"]["user_id"]
+                return {"data": {"text": f"{remark}（{nickname}）：\n"}, "type": "text"}
+
+        async def forward_msgs_wrapper(msg_elements: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+            fmt_msgs: List[Dict] = []
+            for msg in msg_elements:
+                content_list_key = "content" if "content" in msg else "message"
+                content_list = msg.get(content_list_key, [])
+                header_text = await _prepare_forward_message_header(msg, content_list_key)
                 footer_text = {"data": {"text": "\n- - - - - - - - - - - - - - -\n"}, "type": "text"}
-                msg["content"].insert(0, header_text)
-                msg["content"].append(footer_text)
-                for i, inner_msg in enumerate(msg["content"]):
-                    if "content" in inner_msg:
+                content_list.insert(0, header_text)
+                content_list.append(footer_text)
+                content_list_len = len(content_list)
+                skip_footer = False
+                for i, inner_msg in enumerate(content_list):
+                    if i == content_list_len - 1 and skip_footer:
+                        break
+                    elif "content" in inner_msg or inner_msg["type"] == "forward":
                         if i == 1:
                             fmt_msgs.pop()
-                            msg["content"].pop()
-                        fmt_msgs += await forward_msgs_wrapper([inner_msg])
+                            skip_footer = True
+                        if "content" in inner_msg:
+                            fmt_msgs += await forward_msgs_wrapper([inner_msg])
+                        else:
+                            fmt_msgs += await forward_msgs_wrapper(inner_msg["data"]["content"])
                     else:
                         fmt_msgs.append(inner_msg)
             return fmt_msgs
