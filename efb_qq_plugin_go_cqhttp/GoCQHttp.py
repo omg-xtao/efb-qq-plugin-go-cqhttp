@@ -32,8 +32,8 @@ from ehforwarderbot.utils import extra
 from hypercorn.asyncio import serve
 from hypercorn.config import Config as HyperConfig
 from PIL import Image
-from quart.logging import create_logger
 from quart.app import Quart
+from quart.logging import create_logger
 
 from .ChatMgr import ChatManager
 from .Exceptions import (
@@ -43,15 +43,16 @@ from .Exceptions import (
 )
 from .MsgDecorator import QQMsgProcessor
 from .Utils import (
+    DownloadTooLargeError,
     async_send_messages_to_master,
     coolq_text_encode,
     download_file_with_limit,
     download_group_avatar,
     download_user_avatar,
+    fix_cq_image_url_in_reply,
     process_quote_text,
     qq_emoji_list,
     strf_time,
-    DownloadTooLargeError,
 )
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -112,17 +113,17 @@ class GoCQHttp(BaseClient):
         self.coolq_api_timeout = self.client_config.get("api_timeout", 60)
         self.auto_mark_as_read = self.client_config.get("auto_mark_as_read", False)
         self.handle_own_messages = self.client_config.get("handle_own_messages", False)
-        
+
         # File size limit with default 50 MB
         self.file_size_limit_bytes: int = int(self.client_config.get("file_size_limit_mb", 50)) * 1024 * 1024
-        
+
         # Apply monkey patch for message_sent events if enabled
         if self.handle_own_messages:
             self.logger.info("Own message handling enabled - will receive messages sent from other devices")
             self._apply_message_sent_patch()
         else:
             self.logger.info("Own message handling disabled - messages from other devices will be ignored")
-        
+
         self.coolq_bot = CQHttp(
             api_root=self.client_config["api_root"],
             access_token=self.client_config["access_token"],
@@ -147,7 +148,9 @@ class GoCQHttp(BaseClient):
                 remark = str(from_user.get("remark", ""))
                 nickname = str(from_user.get("nickname", ""))
 
-                if not any((c.get("data", {}).get("text", "").strip()) for c in msg.get("content", [])) or (remark == nickname == "1094950020"):
+                if not any((c.get("data", {}).get("text", "").strip()) for c in msg.get("content", [])) or (
+                    remark == nickname == "1094950020"
+                ):
                     return {"data": {"text": ""}, "type": "text"}
 
                 return {"data": {"text": f"{remark}（{nickname}）：\n"}, "type": "text"}
@@ -184,7 +187,7 @@ class GoCQHttp(BaseClient):
 
         async def message_element_wrapper(
             context: Dict[str, Any], msg_element: Dict[str, Any], chat: Chat
-        ) -> Tuple[str, List[Message], List[Tuple[Tuple[int, int], Union[Chat, ChatMember]]]]:
+        ) -> Tuple[str, List[Message], List[Tuple[Tuple[int, int], Union[Chat, ChatMember]]], Optional[Message]]:
             """
             Handle a single `msg_element` from CoolQ.
 
@@ -205,6 +208,7 @@ class GoCQHttp(BaseClient):
             main_text: str = ""
             messages: List[Message] = []
             at_list: List[Tuple[Tuple[int, int], Union[Chat, ChatMember]]] = []
+            target_reply_message: Optional[Message] = None
             if msg_type == "text":
                 main_text = msg_data["text"]
             elif msg_type == "face":
@@ -244,7 +248,9 @@ class GoCQHttp(BaseClient):
                         )
                     else:
                         # 如果没有 'qq'，通过 'id' 调用 get_msg 获取完整消息
-                        original_msg = await self.coolq_api_query("get_msg", message_id=msg_data["id"])
+                        coolq_msg_id = msg_data["id"]
+                        target_reply_message = Message(chat=chat, uid=f"{chat.uid.split('_')[-1]}_{coolq_msg_id}")
+                        original_msg = await self.coolq_api_query("get_msg", message_id=coolq_msg_id)
                         ref_user = await self.get_user_info(original_msg["sender"]["user_id"])
                         original_text = original_msg.get("raw_message")
                         if (
@@ -260,6 +266,7 @@ class GoCQHttp(BaseClient):
                             original_text = "".join(text_segments)
                         if not original_text:
                             original_text = ""
+                        original_text = fix_cq_image_url_in_reply(original_text)
                         main_text = (
                             f'「{ref_user["remark"]}（{ref_user["nickname"]}）：{original_text}」\n'
                             "- - - - - - - - - - - - - - -\n"
@@ -281,15 +288,15 @@ class GoCQHttp(BaseClient):
                 footer_msg = {"data": {"text": "合并转发消息结束"}, "type": "text"}
                 fmt_forward_msgs.insert(0, header_msg)
                 fmt_forward_msgs.append(footer_msg)
-                main_text, messages, _ = await message_elements_wrapper(context, fmt_forward_msgs, chat)
-                return main_text, messages, []
+                main_text, messages, _, _ = await message_elements_wrapper(context, fmt_forward_msgs, chat)
+                return main_text, messages, [], None
             else:
                 messages.extend(await self.call_msg_decorator(msg_type, msg_data, chat))
-            return main_text, messages, at_list
+            return main_text, messages, at_list, target_reply_message
 
         async def message_elements_wrapper(
             context: Dict[str, Any], msg_elements: List[Dict[str, Any]], chat: Chat
-        ) -> Tuple[str, List[Message], Dict[Tuple[int, int], Union[Chat, ChatMember]]]:
+        ) -> Tuple[str, List[Message], Dict[Tuple[int, int], Union[Chat, ChatMember]], Optional[Message]]:
             """
             Iterate through `msg_elements` and call `message_element_wrapper` for each element.
             """
@@ -297,8 +304,13 @@ class GoCQHttp(BaseClient):
             messages: List[Message] = []
             main_text: str = ""
             at_dict: Dict[Tuple[int, int], Union[Chat, ChatMember]] = {}
+            target_reply_message: Optional[Message] = None
             for msg_element in msg_elements:
-                sub_main_text, sub_messages, sub_at_list = await message_element_wrapper(context, msg_element, chat)
+                sub_main_text, sub_messages, sub_at_list, tmp_target_reply_message = await message_element_wrapper(
+                    context, msg_element, chat
+                )
+                if tmp_target_reply_message:
+                    target_reply_message = tmp_target_reply_message
                 main_text_len = len(main_text)
                 for at_tuple in sub_at_list:
                     pos = (
@@ -308,7 +320,7 @@ class GoCQHttp(BaseClient):
                     at_dict[pos] = at_tuple[1]
                 main_text += sub_main_text
                 messages.extend(sub_messages)
-            return main_text, messages, at_dict
+            return main_text, messages, at_dict, target_reply_message
 
         @self.coolq_bot.on_message
         async def handle_msg(context: Event):
@@ -358,9 +370,9 @@ class GoCQHttp(BaseClient):
                 # ignore qq guild message
                 if context["message_type"] == "guild":
                     return
-                
+
                 # Check if this is a self-sent message
-                is_self_sent = getattr(context, '_is_self_sent', False)
+                is_self_sent = getattr(context, "_is_self_sent", False)
                 if is_self_sent and context["message_type"] == "private":
                     qq_uid = context["target_id"]
                     context["user_id"] = qq_uid
@@ -372,8 +384,8 @@ class GoCQHttp(BaseClient):
                     chat: PrivateChat = await self.chat_manager.build_efb_chat_as_private(context)
                 else:
                     chat = await self.chat_manager.build_efb_chat_as_group(context)
-                    is_discuss = context['message_type'] != 'group'
-                    chat_uid = context['discuss_id'] if is_discuss else context['group_id']
+                    is_discuss = context["message_type"] != "group"
+                    chat_uid = context["discuss_id"] if is_discuss else context["group_id"]
                     if len(self.all_group_list) > 0 and chat_uid not in self.all_group_list:
                         print(f"Filter 1 msg from {chat.uid} {chat.name}.")
                         return
@@ -405,7 +417,9 @@ class GoCQHttp(BaseClient):
                 else:  # anonymous user in group
                     author = self.chat_manager.build_efb_chat_as_anonymous_user(chat, context)
 
-                main_text, messages, at_dict = await message_elements_wrapper(context, msg_elements, chat)
+                main_text, messages, at_dict, target_reply_message = await message_elements_wrapper(
+                    context, msg_elements, chat
+                )
 
                 if main_text != "":
                     messages.append(self.msg_decorator.qq_text_simple_wrapper(main_text, at_dict))
@@ -421,6 +435,8 @@ class GoCQHttp(BaseClient):
                     )
                     efb_msg.chat = chat
                     efb_msg.author = author
+                    if target_reply_message:
+                        efb_msg.target = target_reply_message
                     # if qq_uid != '80000000':
 
                     # Append discuss group into group list
@@ -813,9 +829,9 @@ class GoCQHttp(BaseClient):
 
         # Conditionally register message_sent handler if patch is applied
         if self.handle_own_messages:
-            self.coolq_bot.on('message_sent')(handle_msg)
+            self.coolq_bot.on("message_sent")(handle_msg)
             self.logger.info("Registered message_sent handler conditionally")
-        
+
         asyncio.run(self.check_status_periodically(run_once=True))
 
     def run_instance(self, host: str, port: int, debug: bool = False):
@@ -1492,7 +1508,14 @@ class GoCQHttp(BaseClient):
         except Exception:
             return 0
 
-    async def _send_placeholder_file_message(self, context: Dict[str, Any], download_url: str, original_name: str, kind: str, reason: str = "exceeds size limit"):
+    async def _send_placeholder_file_message(
+        self,
+        context: Dict[str, Any],
+        download_url: str,
+        original_name: str,
+        kind: str,
+        reason: str = "exceeds size limit",
+    ):
         """
         Send a text EFB message with a link to a file.
         kind: 'File' | 'Image' | 'Video' etc. For annotation only.
@@ -1544,7 +1567,7 @@ class GoCQHttp(BaseClient):
                 download_url=download_url,
                 original_name=context.get("file", {}).get("name", "file"),
                 kind="File",
-                reason="download failed"
+                reason="download failed",
             )
             return
 
@@ -1654,34 +1677,37 @@ class GoCQHttp(BaseClient):
         """
         Apply monkey patch to handle message_sent events from other devices.
         This patches Event.from_payload to handle go-cqhttp's message_sent format.
-        
+
         Note: We use global monkey patching instead of subclassing because:
         1. aiocqhttp internally uses Event.from_payload in multiple places
         2. The CQHttp library doesn't provide hooks for custom Event classes
         3. Monkey patching ensures compatibility with existing aiocqhttp ecosystem
         4. Thread-safe implementation prevents race conditions
         """
+        from typing import Any, Dict, Optional
+
         from aiocqhttp.event import Event
-        from typing import Dict, Any, Optional
-        
+
         with GoCQHttp._patch_lock:
-            if not hasattr(Event, '_original_from_payload'):
+            if not hasattr(Event, "_original_from_payload"):
                 Event._original_from_payload = Event.from_payload
-                
+
                 @staticmethod
-                def patched_from_payload(payload: Dict[str, Any]) -> 'Optional[Event]':
+                def patched_from_payload(payload: Dict[str, Any]) -> "Optional[Event]":
                     logger = logging.getLogger(__name__)
                     try:
-                        if payload.get('post_type') == 'message_sent':
+                        if payload.get("post_type") == "message_sent":
                             # Convert go-cqhttp format to aiocqhttp expected format
                             patched_payload = payload.copy()
-                            patched_payload['message_sent_type'] = payload.get('message_type', 'unknown')
+                            patched_payload["message_sent_type"] = payload.get("message_type", "unknown")
                             event = Event._original_from_payload(patched_payload)
                             if event:
                                 event._is_self_sent = True
-                                logger.info(f"Processed message_sent event: type={payload.get('message_type')}, "
-                                          f"user_id={payload.get('user_id')}, "
-                                          f"message_id={payload.get('message_id')}")
+                                logger.info(
+                                    f"Processed message_sent event: type={payload.get('message_type')}, "
+                                    f"user_id={payload.get('user_id')}, "
+                                    f"message_id={payload.get('message_id')}"
+                                )
                                 logger.debug(f"Full message_sent payload: {payload}")
                             return event
                         return Event._original_from_payload(payload)
@@ -1689,7 +1715,7 @@ class GoCQHttp(BaseClient):
                         # Fallback to original method on any error
                         logger.warning(f"Error in message_sent patch: {e}, payload: {payload}")
                         return Event._original_from_payload(payload)
-                
+
                 Event.from_payload = patched_from_payload
                 self.logger.info("Applied message_sent event patch for own message handling")
                 self.logger.debug("Monkey patch allows handling of 'message_sent' events with 'message_type' field")

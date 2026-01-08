@@ -1,10 +1,10 @@
 import logging
-import tempfile
-from typing import IO, Optional, Union
 import re
+import tempfile
+import urllib.parse
+from typing import IO, Optional, Union
 
 import httpx
-import urllib.parse
 import pilk
 import pydub
 from ehforwarderbot import Message, coordinator
@@ -657,7 +657,7 @@ def normalize_qq_download_url(url: str) -> str:
     - https://c2cpicdw.qpic.cn/download?... -> https://multimedia.nt.qq.com.cn/download?...
     """
     # Replace IP addresses (with or without port) with NTQQ domain
-    url = re.sub(r'https?://\d+\.\d+\.\d+\.\d+(:\d+)?/', 'https://multimedia.nt.qq.com.cn/', url)
+    url = re.sub(r"https?://\d+\.\d+\.\d+\.\d+(:\d+)?/", "https://multimedia.nt.qq.com.cn/", url)
 
     # Also replace problematic qpic.cn domains with better NTQQ domain
     url = url.replace("c2cpicdw.qpic.cn", "multimedia.nt.qq.com.cn")
@@ -751,7 +751,9 @@ async def async_get_file_with_limit(url: str, max_bytes: Optional[int] = None, e
                 new_image_link = parsed_url._replace(query=new_query_string).geturl()
 
                 try:
-                    temp_file = await async_get_file_with_limit(new_image_link, max_bytes=max_bytes, errcount=errcount + 1)
+                    temp_file = await async_get_file_with_limit(
+                        new_image_link, max_bytes=max_bytes, errcount=errcount + 1
+                    )
                     return temp_file
                 except Exception as e:
                     logger.error(f"Failed to download image with alternative appid: {e}")
@@ -812,6 +814,22 @@ def async_send_messages_to_master(msg: Message):
     finally:
         if msg.file:
             msg.file.close()
+
+
+def fix_cq_image_url_in_reply(text: str) -> str:
+    """
+    Fix &amp; in CQ image URLs
+    """
+    pattern = "\\[CQ:image(.*?)url\\=(.*?),(.*?)\\]"
+
+    for match in re.finditer(pattern, text):
+        full_match = match.group(0)
+        url = match.group(2)
+        fixed_url = " " + url.replace("&amp;", "&") + " "
+        fixed_cq_code = full_match.replace(url, fixed_url)
+        text = text.replace(full_match, fixed_cq_code)
+
+    return text
 
 
 def process_quote_text(text, max_length):
